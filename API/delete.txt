@@ -1,0 +1,12 @@
+POST /api/projects/delete/:id
+
+Response
+{
+  "success": true,
+  "id": "d6e744ba" // 삭제 요청 큐 id
+}
+
+Response (404 Error)
+{
+  "error": "Project not found"
+}

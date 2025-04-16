@@ -1,0 +1,27 @@
+POST /api/projects/update/:id
+{
+  "name": "test-project",
+  "description": "개쩌는 프젝",
+  "gitURL": "git@github.com:Oein/RevolutionShopUI.git",
+  "dockerScript": "RUN bun install",
+  "dockerFrom": "oven/bun",
+  "startCommand": "bun run dev",
+  "exposePort": "5173",
+  "requirePasskeyAuth": false,
+  "allocDomain": "tes123t.ert.im"
+}
+
+Response
+{
+  "success": true
+}
+
+Response (404 Error)
+{
+  "error": "Project not found"
+}
+
+Response (400 Error)
+{
+  "error": "Invalid Body"
+}

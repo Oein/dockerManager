@@ -1,0 +1,23 @@
+POST /api/projects/create
+{
+  "name": "test-project",
+  "description": "개쩌는 프젝",
+  "gitURL": "git@github.com:Oein/RevolutionShopUI.git",
+  "dockerScript": "RUN bun install",
+  "dockerFrom": "oven/bun",
+  "startCommand": "bun run dev",
+  "exposePort": "5173",
+  "requirePasskeyAuth": false,
+  "allocDomain": "tes123t.ert.im"
+}
+
+Response
+{
+  "id": "d6e744ba", // 생성된 프젝 id
+  "build": "a8fff16f" // 빌드 id
+}
+
+Response (400 Error)
+{
+  "error": "Invalid Body"
+}

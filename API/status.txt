@@ -1,0 +1,11 @@
+GET /api/projects/status/:id
+
+Response
+{
+  "status": "running" | "exited" // 이외의 것들이 있을 수 있으나 아직 잘 모르기 때문에 running인지로 확인하여 구현
+}
+
+Response (404 Error)
+{
+  "error": "Project not found"
+}

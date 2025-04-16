@@ -1,0 +1,21 @@
+GET /api/projects/:id
+
+Response
+{
+  "projectID": "d6e744ba",
+  "gitURL": "git@github.com:Oein/RevolutionShopUI.git",
+  "dockerScript": "RUN bun install",
+  "dockerFrom": "oven/bun",
+  "startCommand": "bun run dev",
+  "containerExportPort": "5173",
+  "requirePasskeyAuth": false,
+  "allocDomain": "tes123t.ert.im",
+  "containerID": "d6e744ba_a8fff16f",
+  "containerIP": "172.20.174.193",
+  "containerImageID": "a8fff16f"
+}
+
+Response (404 Error)
+{
+  "error": "Project not found"
+}

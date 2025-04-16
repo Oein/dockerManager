@@ -1,0 +1,6 @@
+GET /api/projects/list
+
+Response
+[
+  "d6e744ba" // 프젝 id들의 나열
+]

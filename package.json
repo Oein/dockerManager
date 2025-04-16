@@ -1,0 +1,19 @@
+{
+  "name": "dockermanager",
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/express": "^5.0.1"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "express": "^5.1.0",
+    "node-docker-api": "^1.1.22",
+    "typed-emitter": "^2.1.0"
+  },
+  "version": "0.0.1-dev"
+}

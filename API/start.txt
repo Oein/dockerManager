@@ -1,0 +1,16 @@
+GET /api/projects/start/:id
+
+Response
+{
+  "success": true
+}
+
+Response (500 Error)
+{
+  "error": "Failed to start ..."
+}
+
+Response (404 Error)
+{
+  "error": "Project not found"
+}

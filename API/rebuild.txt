@@ -1,0 +1,12 @@
+POST /api/projects/rebuild/:id
+
+Response
+{
+  "id": "d6e744ba", // 프젝 id
+  "build": "a8fff16f" // 빌드 id
+}
+
+Response (404 Error)
+{
+  "error": "Project not found"
+}

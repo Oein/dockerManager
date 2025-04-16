@@ -1,0 +1,40 @@
+GET /api/projects/logs/71db616d
+Query
+(optional) until: Timestamp [ex: 2025-04-16T08:59:22.994182716Z]
+(optional) since: Timestamp [ex: 2025-04-16T08:59:22.994182716Z]
+
+Response
+{
+  "logs": "2025-04-16T08:59:22.994182716Z 8:59:22 AM [vite] (client) Forced re-optimization of dependencies\n2025-04-16T08:59:23.012092299Z \n2025-04-16T08:59:23.012106424Z   VITE v6.2.5  ready in 248 ms\n2025-04-16T08:59:23.012107716Z \n2025-04-16T08:59:23.012164424Z   ➜  Local:   http://localhost:5173/\n2025-04-16T08:59:23.012167882Z   ➜  Network: use --host to expose\n"
+}
+
+Response (404 Error)
+{
+  "error": "Project not found"
+}
+
+로그는 가장 최근으로부터 100개를 가져옴.
+구현할때 가장 최근 Timestamp와 가장 처음 Timestamp를 가지고 있으며,
+특정 주기로 since값에 가장 마지막 Timestamp를 넣어서 새로운 로그가 있는지 확인
+    이후 다음 Timestamp를 확인하여 업데이트
+유저가 스크롤을 올리며 오래전 로그가 필요할경우 가장 처음 Timestamp를 넣고 엣날 로그를 확인
+    이후 다음 Timestamp를 확인하여 업데이트
+
+## 주의 ## since와 until은 그 시간에 있는 로그까지 포함하기에 이미 존재하는 로그의 타임스템프를 넣을경우 최소 1개 이상이 표시됨을 알고 사용하자.
+
+예시
+= 현재 로그
+12:23 asdasd
+12:24 adsdsa
+12:25 sdaasd
+
+GET ?since=12:24
+12:24 adsdsa
+12:25 sdaasd
+
+GET ?until=12:24
+12:23 asdasd
+12:24 adsdsa
+
+GET ?until=12:23
+12:23 asdasd
