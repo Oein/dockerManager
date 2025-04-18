@@ -5,6 +5,7 @@ import fs from "fs/promises";
 import { exec, spawn } from "child_process";
 import logger from "../logger";
 import Storage from "./Storage";
+import { log2Project } from "../routes/api/projects";
 
 type MessageEvents = {
   consoleLog: (message: string) => void;
@@ -57,11 +58,36 @@ class Emitter extends require("events") {
         args,
       });
     }
+    if (this.projectID != null) {
+      log2Project(
+        this.projectID,
+        type.padStart(15, " ") +
+          " | " +
+          args
+            .map((x: any) =>
+              typeof x == "object"
+                ? (() => {
+                    try {
+                      return JSON.stringify(x);
+                    } catch (e) {
+                      return x;
+                    }
+                  })()
+                : x.toString()
+            )
+            .join(" ")
+      );
+    }
   }
 
   globalListener: ((event: any) => void) | null = null;
   setGlobalListener(listener: (event: any) => void) {
     this.globalListener = listener;
+  }
+
+  projectID: string | null = null;
+  setProjectID(projectID: string) {
+    this.projectID = projectID;
   }
 }
 
@@ -112,6 +138,7 @@ export function reloadNginx() {
 class ContainerBuilderInstance {
   emitter = new Emitter() as any as TypedEmitter<MessageEvents> & {
     setGlobalListener: (listener: (event: any) => void) => void;
+    setProjectID: (projectID: string) => void;
   };
   query: BuildQuery | null = null;
   TMP_DIR: string | null = null;
@@ -121,6 +148,7 @@ class ContainerBuilderInstance {
   constructor(query: BuildQuery) {
     this.buildID = Math.random().toString(16).slice(2, 10);
     this.query = query;
+    this.emitter.setProjectID(query.projectID);
   }
 
   async build() {
@@ -340,6 +368,10 @@ class ContainerBuilderInstance {
           containerImageID: this__.buildID,
         });
         this__.emitter.emit("consoleLog", "Project database updated!");
+        Storage.scope("project-deploy").set(this__.query!.projectID, {
+          gitHash: this__.gitHash,
+          buildID: this__.buildID,
+        });
         return true;
       },
     ];

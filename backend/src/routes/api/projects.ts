@@ -5,10 +5,35 @@ import logger from "../../logger";
 import path from "path";
 import fs from "fs/promises";
 import { _NGINX_DIR } from "../..";
-import { $ } from "bun";
+import { exec } from "child_process";
+
+async function $(
+  cmd: string
+): Promise<{ text: () => string; exitCode: number }> {
+  return new Promise((resolve, reject) => {
+    exec(cmd, (error, stdout, stderr) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve({
+        text: () => stdout.toString(),
+        exitCode: error ? (error as any).code : 0,
+      });
+    });
+  });
+}
 
 const app = express.Router();
 const db = Storage.scope("projects");
+
+let logsForProject: { [key: string]: [string, number][] } = {};
+export function log2Project(projectID: string, log: string) {
+  if (!logsForProject[projectID]) {
+    logsForProject[projectID] = [];
+  }
+  logsForProject[projectID].push([log, Date.now()]);
+}
 
 if ((await Storage.waitLoaded()) && !(await db.has("id"))) {
   await db.set("id", []);
@@ -123,9 +148,9 @@ const deleteManager = () => {
       }),
       (async () => {
         // remove container
-        await $`docker rm -f ${deleteInstance.containerID}`;
+        await $(`docker rm -f ${deleteInstance.containerID}`);
         logger.success("Builder", "Deleted container", deleteInstance.id);
-        await $`docker rmi ${deleteInstance.containerImageID}`;
+        await $(`docker rmi ${deleteInstance.containerImageID}`);
         logger.success("Builder", "Deleted image", deleteInstance.id);
       })().catch((err) => {
         logger.error("Builder", "Error deleting container", err);
@@ -285,48 +310,8 @@ app.post("/update/:id", async (req, res) => {
     res.status(400).json({ error: "No body provided" });
     return;
   }
-  const {
-    name,
-    description,
-    gitURL,
-    dockerScript,
-    startCommand,
-    exposePort,
-    requirePasskeyAuth,
-    allocDomain,
-    dockerFrom,
-  } = req.body;
-  // check if all required fields are present
-  if (
-    !name ||
-    !gitURL ||
-    !dockerScript ||
-    !startCommand ||
-    !exposePort ||
-    !allocDomain ||
-    !dockerFrom ||
-    typeof requirePasskeyAuth !== "boolean"
-  ) {
-    res.status(400).json({ error: "Missing required fields" });
-    return;
-  }
-  const newProject: Project = {
-    id,
-    name,
-    description,
-    gitURL,
-    dockerScript,
-    dockerFrom,
-    startCommand,
-    containerIP: project.containerIP,
-    containerID: project.containerID,
-    containerImageID: project.containerImageID,
-    containerExportPort: exposePort,
-    requirePasskeyAuth,
-    allocDomain,
-  };
 
-  await db.set(id, newProject);
+  await db.set(id, req.body);
   await db.get("id").then(async (projects: string[]) => {
     if (!projects.includes(id)) {
       projects.push(id);
@@ -344,15 +329,75 @@ app.get("/logs/:id", async (req, res) => {
     res.status(404).json({ error: "Project not found" });
     return;
   }
+
+  // check if container is running and deployed
+  if (!project.containerID) {
+    res.status(404).json({ error: "Container not found" });
+    return;
+  }
+  // check if container is running
+  const status = await $(
+    `docker inspect -f '{{.State.Status}}' ${project.containerID}`
+  );
+  if (status.text().trim() !== "running") {
+    res.status(404).json({ error: "Container not running" });
+    return;
+  }
+
   const until = req.query.until;
   const since = req.query.since;
 
-  const logs = await $`docker logs --tail 100 -t${
-    typeof until == "string" ? `--until ${until}` : ""
-  }${typeof since == "string" ? `--since ${since}` : ""} ${
+  const cmd = `logs --tail 100 --timestamps${
+    typeof until == "string" ? ` --until "${until}"` : ""
+  }${typeof since == "string" ? ` --since "${since}"` : ""} ${
     project.containerID
   }`;
-  res.json({ logs: logs.text("utf-8") });
+
+  const logs = await $(`docker ${cmd}`);
+  res.json({ logs: logs.text() });
+});
+
+app.get("/events/:id", async (req, res) => {
+  const { id } = req.params;
+  const project = await db.get(id);
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  const since = req.query.since;
+  const until = req.query.until;
+
+  if (!(id in logsForProject)) {
+    res.json({ logs: [] });
+    return;
+  }
+  // binary search for logs
+  let from = 0;
+  let to = Number.MAX_SAFE_INTEGER;
+
+  if (typeof since == "string") {
+    from = parseInt(since);
+  }
+  if (typeof until == "string") {
+    to = parseInt(until);
+  }
+
+  // binary search for logs
+  let low = 0;
+  let high = logsForProject[id].length - 1;
+  let mid = 0;
+  while (low <= high) {
+    mid = Math.floor((low + high) / 2);
+    if (logsForProject[id][mid][1] < from) {
+      low = mid + 1;
+    } else if (logsForProject[id][mid][1] > to) {
+      high = mid - 1;
+    } else {
+      break;
+    }
+  }
+  const logs = logsForProject[id].slice(low, high + 1);
+  res.json({ logs });
 });
 
 app.get("/status/:id", async (req, res) => {
@@ -362,9 +407,10 @@ app.get("/status/:id", async (req, res) => {
     res.status(404).json({ error: "Project not found" });
     return;
   }
-  const status =
-    await $`docker inspect -f '{{.State.Status}}' ${project.containerID}`;
-  res.json({ status: status.text("utf-8") });
+  const status = await $(
+    `docker inspect -f '{{.State.Status}}' ${project.containerID}`
+  );
+  res.json({ status: status.text() });
 });
 
 app.get("/start/:id", async (req, res) => {
@@ -375,12 +421,22 @@ app.get("/start/:id", async (req, res) => {
     return;
   }
 
-  const start = await $`docker start ${project.containerID}`;
+  const start = await $(`docker start ${project.containerID}`);
   if (start.exitCode !== 0) {
     res.status(500).json({ error: "Failed to start container" });
     return;
   }
   res.json({ success: true });
+});
+
+app.get("/container/:id", async (req, res) => {
+  const { id } = req.params;
+  const project = await Storage.scope("project-deploy").get(id);
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  res.json(project);
 });
 
 app.get("/:id", (req, res) => {
