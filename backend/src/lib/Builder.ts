@@ -1,6 +1,6 @@
 import path from "path";
 import type TypedEmitter from "typed-emitter";
-import { _NGINX_DIR, _TMP_DIR } from "..";
+import { _APP_DIR, _NGINX_DIR, _TMP_DIR } from "..";
 import fs from "fs/promises";
 import { exec, spawn } from "child_process";
 import logger from "../logger";
@@ -250,6 +250,22 @@ class ContainerBuilderInstance {
         try {
           newContainerIP = await getContainerIP();
           this__.emitter.emit("consoleLog", `Container IP: ${newContainerIP}`);
+        } catch (e: any) {
+          this__.emitter.emit("consoleError", e.toString());
+          this__.emitter.emit("queryFinished", {
+            success: false,
+            error: e.toString(),
+          });
+          return false;
+        }
+
+        return true;
+      },
+      // 5.5. create appdata directory
+      async () => {
+        try {
+          const APPDIR = path.join(_APP_DIR, this.query!.projectID);
+          await fs.mkdir(APPDIR, { recursive: true });
         } catch (e: any) {
           this__.emitter.emit("consoleError", e.toString());
           this__.emitter.emit("queryFinished", {
@@ -570,7 +586,10 @@ CMD ${this.query!.startCommand}`;
   async runContainer(newContainerIP: string) {
     let command = `docker run --name ${this.query!.projectID}_${
       this.buildID
-    } --network br0 --ip ${newContainerIP} --restart=unless-stopped -d ${
+    } -v ${path.join(
+      _APP_DIR,
+      this.query!.projectID
+    )}:/appdata --network br0 --ip ${newContainerIP} --restart=unless-stopped -d ${
       this.buildID
     }`;
 
@@ -786,7 +805,7 @@ export async function getContainerIP() {
     const ip1 = Math.floor(Math.random() * 255);
     const ip2 = Math.floor(Math.random() * 255);
     const ip = `172.20.${ip1}.${ip2}`;
-    if (ip == `172.20.0.1`) {
+    if (ip1 == 0) {
       return await getIP();
     }
     if (await ipStorage.has(ip)) {

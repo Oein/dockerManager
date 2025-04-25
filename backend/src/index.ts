@@ -18,6 +18,14 @@ if (!_TMP_DIR_EXISTS) {
   logger.success("Global", "Created tmp directory");
 }
 
+export const _APP_DIR = path.join(__dirname, "..", "app");
+const _APP_DIR_EXISTS = await fs.exists(_APP_DIR).catch(() => false);
+
+if (!_APP_DIR_EXISTS) {
+  await fs.mkdir(_APP_DIR, { recursive: true });
+  logger.success("Global", "Created app directory");
+}
+
 export const _NGINX_DIR = path.join(__dirname, "..", "nginx");
 
 import app from "./routes";
