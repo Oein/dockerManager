@@ -802,7 +802,7 @@ export async function getContainerIP() {
   const ipStorage = Storage.scope("ip");
   // 172.20.xxx.xxx
   const getIP = async () => {
-    const ip1 = Math.floor(Math.random() * 255);
+    const ip1 = Math.floor(Math.random() * 250) + 2;
     const ip2 = Math.floor(Math.random() * 255);
     const ip = `172.20.${ip1}.${ip2}`;
     if (ip1 == 0) {
