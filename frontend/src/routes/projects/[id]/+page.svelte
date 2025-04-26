@@ -521,7 +521,7 @@
               </p>
               <button
                 class="ml-2 text-gray-500 hover:text-gray-700"
-                on:click={() => toggleEdit("containerExportPort")}
+                on:click={() => toggleEdit("forceIP")}
               >
                 ✏️
               </button>
