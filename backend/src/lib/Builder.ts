@@ -399,7 +399,7 @@ class ContainerBuilderInstance {
       );
       const result = await steps[i]();
       if (!result) {
-        await this.cleanUp();
+        await this.cleanUp(true);
         this.emitter.emit("consoleLog", `Step ${i + 1} failed!`);
         return;
       }
@@ -412,13 +412,60 @@ class ContainerBuilderInstance {
     });
   }
 
-  async cleanUp() {
+  async cleanUp(hasError = false) {
     this.emitter.emit("consoleLog", `Cleaning up...`);
     if (!this.TMP_DIR) {
       this.emitter.emit("consoleLog", `No tmp directory to clean up!`);
       return;
     }
     await fs.rm(this.TMP_DIR!, { recursive: true, force: true });
+
+    // cleanup docker container and image
+    // Remove the Docker container and image associated with the current build
+    if(hasError)
+    try {
+      const containerName = `${this.query!.projectID}_${this.buildID}`;
+      this.emitter.emit("consoleLog", `Removing container: ${containerName}...`);
+      await new Promise<void>((resolve, reject) => {
+        const removeContainerChild = spawn("docker", ["rm", "-f", containerName], {
+          shell: true,
+        });
+        removeContainerChild.on("close", (code) => {
+          if (code === 0) {
+            this.emitter.emit("consoleLog", `Container ${containerName} removed!`);
+            resolve();
+          } else {
+            this.emitter.emit(
+              "consoleError",
+              `Failed to remove container ${containerName}, exited with code ${code}`
+            );
+            reject(new Error(`Failed to remove container ${containerName}`));
+          }
+        });
+      });
+
+      this.emitter.emit("consoleLog", `Removing image: ${this.buildID}...`);
+      await new Promise<void>((resolve, reject) => {
+        const removeImageChild = spawn("docker", ["rmi", "-f", this.buildID], {
+          shell: true,
+        });
+        removeImageChild.on("close", (code) => {
+          if (code === 0) {
+            this.emitter.emit("consoleLog", `Image ${this.buildID} removed!`);
+            resolve();
+          } else {
+            this.emitter.emit(
+              "consoleError",
+              `Failed to remove image ${this.buildID}, exited with code ${code}`
+            );
+            reject(new Error(`Failed to remove image ${this.buildID}`));
+          }
+        });
+      });
+    } catch (error: any) {
+      this.emitter.emit("consoleError", `Cleanup error: ${error.message}`);
+    }
+
     this.emitter.emit("consoleLog", `Cleaned up!`);
   }
 
@@ -586,10 +633,7 @@ CMD ${this.query!.startCommand}`;
   async runContainer(newContainerIP: string) {
     let command = `docker run --name ${this.query!.projectID}_${
       this.buildID
-    } -v ${path.join(
-      _APP_DIR,
-      this.query!.projectID
-    )}:/appdata --network br0 --ip ${newContainerIP} --restart=unless-stopped -d ${
+    } -v sharedVolume:/appdata --network br0 --ip ${newContainerIP} --restart=unless-stopped -d ${
       this.buildID
     }`;
 
@@ -652,8 +696,8 @@ server {
     listen 443 ssl;
     server_name ${this.query?.allocDomain};
 
-    ssl_certificate "/etc/nginx/ssl/ert.im_ecc/fullchain.cer";
-    ssl_certificate_key "/etc/nginx/ssl/ert.im_ecc/ert.im.key";
+    ssl_certificate "/etc/nginx/conf.d/ssl/${this.query?.allocDomain.split(".").slice(1).join(".")}/cert.pem";
+    ssl_certificate_key "/etc/nginx/conf.d/ssl/${this.query?.allocDomain.split(".").slice(1).join(".")}/cert.key";
 
     ${
       this.query?.requirePasskeyAuth

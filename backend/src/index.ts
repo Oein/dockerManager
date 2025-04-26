@@ -26,7 +26,7 @@ if (!_APP_DIR_EXISTS) {
   logger.success("Global", "Created app directory");
 }
 
-export const _NGINX_DIR = "/Volumes/hdd_3/nginx";
+export const _NGINX_DIR = "/Users/poikr/Documents/nginx";
 
 import app from "./routes";
 
