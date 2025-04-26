@@ -13,6 +13,7 @@ export interface Project {
   startCommand: string;
   containerIP: string | null;
   containerID: string | null;
+  forceIP: string;
   containerImageID: string | null;
   containerExportPort: string;
   requirePasskeyAuth: boolean;
@@ -337,7 +338,5 @@ export class DockerManagerClient {
   }
 }
 
-const client = new DockerManagerClient(
-  import.meta.env.VITE_API_URL || "/api"
-);
+const client = new DockerManagerClient(import.meta.env.VITE_API_URL || "/api");
 export default client;

@@ -467,29 +467,57 @@
               </button>
             {/if}
           </div>
+
           <div class="flex items-center mb-2">
-            {#if editingFields.containerExportPort}
+            {#if editingFields.dockerFrom}
               <input
                 type="text"
                 class="border rounded p-1 flex-grow"
-                bind:this={inputRefs.containerExportPort}
-                bind:value={project.containerExportPort}
+                bind:this={inputRefs.dockerFrom}
+                bind:value={project.dockerFrom}
                 on:blur={() => {
-                  toggleEdit("containerExportPort");
+                  toggleEdit("dockerFrom");
                   if (!project) {
                     toast.error("Project not found");
                     return;
                   }
-                  updateProject(
-                    "containerExportPort",
-                    project.containerExportPort
-                  );
+                  updateProject("dockerFrom", project.dockerFrom);
                 }}
               />
             {:else}
               <p class="flex-grow">
-                <strong>Container Export Port:</strong>
-                {project.containerExportPort}
+                <strong>Docker From:</strong>
+                {project.dockerFrom}
+              </p>
+              <button
+                class="ml-2 text-gray-500 hover:text-gray-700"
+                on:click={() => toggleEdit("dockerFrom")}
+              >
+                ✏️
+              </button>
+            {/if}
+          </div>
+
+          <div class="flex items-center mb-2">
+            {#if editingFields.forceIP}
+              <input
+                type="text"
+                class="border rounded p-1 flex-grow"
+                bind:this={inputRefs.forceIP}
+                bind:value={project.forceIP}
+                on:blur={() => {
+                  toggleEdit("forceIP");
+                  if (!project) {
+                    toast.error("Project not found");
+                    return;
+                  }
+                  updateProject("forceIP", project.forceIP);
+                }}
+              />
+            {:else}
+              <p class="flex-grow">
+                <strong>Force IP:</strong>
+                {project.forceIP}
               </p>
               <button
                 class="ml-2 text-gray-500 hover:text-gray-700"

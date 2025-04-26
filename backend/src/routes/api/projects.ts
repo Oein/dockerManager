@@ -53,6 +53,7 @@ type Project = {
   containerID: string | null;
   containerIP: string | null;
   containerImageID: string | null;
+  forceIP: string;
   containerExportPort: string;
   requirePasskeyAuth: boolean;
 };
@@ -186,6 +187,7 @@ app.post("/create", async (req, res) => {
     requirePasskeyAuth,
     allocDomain,
     dockerFrom,
+    forceIP,
   } = req.body;
   // check if all required fields are present
   if (
@@ -216,6 +218,7 @@ app.post("/create", async (req, res) => {
     containerExportPort: exposePort,
     requirePasskeyAuth,
     allocDomain,
+    forceIP: forceIP || "",
   };
   const buildInstance = new ContainerBuilderInstance({
     projectID: id,
@@ -226,6 +229,7 @@ app.post("/create", async (req, res) => {
     containerExportPort: exposePort,
     requirePasskeyAuth,
     allocDomain,
+    forceIP: forceIP == "" ? null : forceIP,
 
     oldContainerID: null,
     oldContainerIP: null,
@@ -257,6 +261,7 @@ app.post("/rebuild/:id", async (req, res) => {
     containerExportPort: project.containerExportPort,
     requirePasskeyAuth: project.requirePasskeyAuth,
     allocDomain: project.allocDomain,
+    forceIP: project.forceIP == "" ? null : project.forceIP,
 
     oldContainerID: project.containerID,
     oldContainerIP: project.containerIP,

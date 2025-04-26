@@ -44,6 +44,8 @@ type BuildQuery = {
   oldContainerIP: string | null;
   oldContainerImageID: string | null;
 
+  forceIP?: string | null;
+
   containerExportPort: string;
   requirePasskeyAuth: boolean;
 };
@@ -248,7 +250,8 @@ class ContainerBuilderInstance {
       // 5. get container ip
       async () => {
         try {
-          newContainerIP = await getContainerIP();
+          newContainerIP = this.query?.forceIP || (await getContainerIP());
+          await Storage.scope("ip").set(newContainerIP, true);
           this__.emitter.emit("consoleLog", `Container IP: ${newContainerIP}`);
         } catch (e: any) {
           this__.emitter.emit("consoleError", e.toString());
@@ -277,44 +280,7 @@ class ContainerBuilderInstance {
 
         return true;
       },
-      // 6. run container
-      async () => {
-        try {
-          this__.emitter.emit("consoleLog", "Running container...");
-          const result = await this__.runContainer(newContainerIP!);
-          if (!result) {
-            this__.emitter.emit("consoleError", "Failed to run container!");
-            return false;
-          }
-          this__.emitter.emit("consoleLog", "Container running!");
-        } catch (e: any) {
-          this__.emitter.emit("consoleError", e.toString());
-          this__.emitter.emit("queryFinished", {
-            success: false,
-            error: e.toString(),
-          });
-          return false;
-        }
 
-        return true;
-      },
-      // 7. change nginx config
-      async () => {
-        try {
-          this__.emitter.emit("consoleLog", "Modifying nginx config...");
-          await this__.modifyNginx(newContainerIP!);
-          this__.emitter.emit("consoleLog", "Nginx config modified!");
-        } catch (e: any) {
-          this__.emitter.emit("consoleError", e.toString());
-          this__.emitter.emit("queryFinished", {
-            success: false,
-            error: e.toString(),
-          });
-          return false;
-        }
-
-        return true;
-      },
       // 8. disalloc container ip
       async () => {
         if (typeof this__.query?.oldContainerIP != "string") {
@@ -362,6 +328,45 @@ class ContainerBuilderInstance {
           this__.emitter.emit("consoleLog", "Old image removed!");
         } catch (e: any) {
           this__.emitter.emit("consoleError", e.toString());
+        }
+
+        return true;
+      },
+
+      // 6. run container
+      async () => {
+        try {
+          this__.emitter.emit("consoleLog", "Running container...");
+          const result = await this__.runContainer(newContainerIP!);
+          if (!result) {
+            this__.emitter.emit("consoleError", "Failed to run container!");
+            return false;
+          }
+          this__.emitter.emit("consoleLog", "Container running!");
+        } catch (e: any) {
+          this__.emitter.emit("consoleError", e.toString());
+          this__.emitter.emit("queryFinished", {
+            success: false,
+            error: e.toString(),
+          });
+          return false;
+        }
+
+        return true;
+      },
+      // 7. change nginx config
+      async () => {
+        try {
+          this__.emitter.emit("consoleLog", "Modifying nginx config...");
+          await this__.modifyNginx(newContainerIP!);
+          this__.emitter.emit("consoleLog", "Nginx config modified!");
+        } catch (e: any) {
+          this__.emitter.emit("consoleError", e.toString());
+          this__.emitter.emit("queryFinished", {
+            success: false,
+            error: e.toString(),
+          });
+          return false;
         }
 
         return true;
@@ -422,49 +427,63 @@ class ContainerBuilderInstance {
 
     // cleanup docker container and image
     // Remove the Docker container and image associated with the current build
-    if(hasError)
-    try {
-      const containerName = `${this.query!.projectID}_${this.buildID}`;
-      this.emitter.emit("consoleLog", `Removing container: ${containerName}...`);
-      await new Promise<void>((resolve, reject) => {
-        const removeContainerChild = spawn("docker", ["rm", "-f", containerName], {
-          shell: true,
+    if (hasError)
+      try {
+        const containerName = `${this.query!.projectID}_${this.buildID}`;
+        this.emitter.emit(
+          "consoleLog",
+          `Removing container: ${containerName}...`
+        );
+        await new Promise<void>((resolve, reject) => {
+          const removeContainerChild = spawn(
+            "docker",
+            ["rm", "-f", containerName],
+            {
+              shell: true,
+            }
+          );
+          removeContainerChild.on("close", (code) => {
+            if (code === 0) {
+              this.emitter.emit(
+                "consoleLog",
+                `Container ${containerName} removed!`
+              );
+              resolve();
+            } else {
+              this.emitter.emit(
+                "consoleError",
+                `Failed to remove container ${containerName}, exited with code ${code}`
+              );
+              reject(new Error(`Failed to remove container ${containerName}`));
+            }
+          });
         });
-        removeContainerChild.on("close", (code) => {
-          if (code === 0) {
-            this.emitter.emit("consoleLog", `Container ${containerName} removed!`);
-            resolve();
-          } else {
-            this.emitter.emit(
-              "consoleError",
-              `Failed to remove container ${containerName}, exited with code ${code}`
-            );
-            reject(new Error(`Failed to remove container ${containerName}`));
-          }
-        });
-      });
 
-      this.emitter.emit("consoleLog", `Removing image: ${this.buildID}...`);
-      await new Promise<void>((resolve, reject) => {
-        const removeImageChild = spawn("docker", ["rmi", "-f", this.buildID], {
-          shell: true,
+        this.emitter.emit("consoleLog", `Removing image: ${this.buildID}...`);
+        await new Promise<void>((resolve, reject) => {
+          const removeImageChild = spawn(
+            "docker",
+            ["rmi", "-f", this.buildID],
+            {
+              shell: true,
+            }
+          );
+          removeImageChild.on("close", (code) => {
+            if (code === 0) {
+              this.emitter.emit("consoleLog", `Image ${this.buildID} removed!`);
+              resolve();
+            } else {
+              this.emitter.emit(
+                "consoleError",
+                `Failed to remove image ${this.buildID}, exited with code ${code}`
+              );
+              reject(new Error(`Failed to remove image ${this.buildID}`));
+            }
+          });
         });
-        removeImageChild.on("close", (code) => {
-          if (code === 0) {
-            this.emitter.emit("consoleLog", `Image ${this.buildID} removed!`);
-            resolve();
-          } else {
-            this.emitter.emit(
-              "consoleError",
-              `Failed to remove image ${this.buildID}, exited with code ${code}`
-            );
-            reject(new Error(`Failed to remove image ${this.buildID}`));
-          }
-        });
-      });
-    } catch (error: any) {
-      this.emitter.emit("consoleError", `Cleanup error: ${error.message}`);
-    }
+      } catch (error: any) {
+        this.emitter.emit("consoleError", `Cleanup error: ${error.message}`);
+      }
 
     this.emitter.emit("consoleLog", `Cleaned up!`);
   }
@@ -696,8 +715,14 @@ server {
     listen 443 ssl;
     server_name ${this.query?.allocDomain};
 
-    ssl_certificate "/etc/nginx/conf.d/ssl/${this.query?.allocDomain.split(".").slice(1).join(".")}/cert.pem";
-    ssl_certificate_key "/etc/nginx/conf.d/ssl/${this.query?.allocDomain.split(".").slice(1).join(".")}/cert.key";
+    ssl_certificate "/etc/nginx/conf.d/ssl/${this.query?.allocDomain
+      .split(".")
+      .slice(1)
+      .join(".")}/cert.pem";
+    ssl_certificate_key "/etc/nginx/conf.d/ssl/${this.query?.allocDomain
+      .split(".")
+      .slice(1)
+      .join(".")}/cert.key";
 
     ${
       this.query?.requirePasskeyAuth
@@ -855,7 +880,6 @@ export async function getContainerIP() {
     if (await ipStorage.has(ip)) {
       return await getIP();
     }
-    await ipStorage.set(ip, true);
     return ip;
   };
 
